@@ -41,5 +41,4 @@ func copyReq(origin *request.Request) *request.Request {
 	r := *origin
 	return &r
 }
-
 ```

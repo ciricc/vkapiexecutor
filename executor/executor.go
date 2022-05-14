@@ -19,10 +19,10 @@ type HttpRequestHandler func(next HttpRequestHandlerNext, req *http.Request) err
 
 // Отвечает за выполнение API запросов ВКонтакте
 type Executor struct {
-	HttpClient        *http.Client                   // HTTP клиент для отправки запросов. Вы можете задать свой клиент, настроив, например, прокси или KeepAlive соединение
-	ResponseParser    responseparser.IResponseParser // Парсер ответа ВКонтакте. Можно переназначить для парсинга других форматов
-	apiRequestHandle  ApiRequestHandler              // Последний добавленный обработчик API запроса
-	httpRequestHandle HttpRequestHandler             // Последний добавленный обработчик HTTP запроса
+	HttpClient        *http.Client          // HTTP клиент для отправки запросов. Вы можете задать свой клиент, настроив, например, прокси или KeepAlive соединение
+	ResponseParser    responseparser.Parser // Парсер ответа ВКонтакте. Можно переназначить для парсинга других форматов
+	apiRequestHandle  ApiRequestHandler     // Последний добавленный обработчик API запроса
+	httpRequestHandle HttpRequestHandler    // Последний добавленный обработчик HTTP запроса
 }
 
 func New() *Executor {
@@ -72,22 +72,30 @@ func (v *Executor) HandleHttpRequest(handler HttpRequestHandler) {
 /* Выполняет запрос к VK API
    Используйте executor.DoRequestCtx(), если есть задача контролировать таймаут и контекст запроса
 */
-func (v *Executor) DoRequest(req *request.Request) (response.IResponse, error) {
+func (v *Executor) DoRequest(req *request.Request) (response.Response, error) {
 	return v.DoRequestCtx(context.Background(), req)
 }
 
-/*
-  Выполняет запрос к VK API.
-  В услучае успешного выполнения http.Request,
-  но неуспешного выполнения request.Request, вернется ошибка error и объект с полным ответом API.
-  Если при выполнении http.Request появится ошибка, то response.IResponse == nil
+// Выполняет запрос к VK API.
+func (v *Executor) DoRequestCtx(ctx context.Context, req *request.Request) (response.Response, error) {
+	return v.DoRequestCtxParser(ctx, req, v.ResponseParser)
+}
 
-  Используйте контексты context для передачи каких-либо значений в объект ответа или
-  для создания таймаута выполнения запроса.
+/*
+   Выполняет запрос к VK API.
+   Используйте ctx для передачи значений в middleware или для создания таймаутов на выполнение запроса
+   Вы можете задать свой собственный парсер ответа. Например, ВКонтакте поддерживает формат messagepack (users.get.msgpack)
+
+   Возвращает ответ VK API. В случае, если возникла ошибка выоплнения HTTP запроса, то будет response.Response == nil.
+   Если возникла ошибка при вызове метода API, вернется полный ответ сервера и информация об ошибке типа response.Error
 */
-func (v *Executor) DoRequestCtx(ctx context.Context, req *request.Request) (response.IResponse, error) {
+func (v *Executor) DoRequestCtxParser(ctx context.Context, req *request.Request, parser responseparser.Parser) (response.Response, error) {
 	if req == nil {
 		return nil, fmt.Errorf("input request empty")
+	}
+
+	if parser == nil {
+		return nil, fmt.Errorf("response parser is nil")
 	}
 
 	err := v.apiRequestHandle(nil, ctx, req)
@@ -99,8 +107,9 @@ func (v *Executor) DoRequestCtx(ctx context.Context, req *request.Request) (resp
 		return nil, fmt.Errorf("after middleware chanining input request is empty")
 	}
 
-	reqCtx := req.SetContextKey(ctx)
+	reqCtx := req.SetContextValue(ctx)
 	httpReq, err := req.HttpRequestPost()
+
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +134,7 @@ func (v *Executor) DoRequestCtx(ctx context.Context, req *request.Request) (resp
 		return nil, fmt.Errorf("http error: %w", err)
 	}
 
-	apiResponse, err := v.ResponseParser.Parse(res)
+	apiResponse, err := parser.Parse(res)
 	defer res.Body.Close()
 
 	if err != nil {

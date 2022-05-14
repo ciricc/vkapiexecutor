@@ -10,7 +10,7 @@ import (
 )
 
 // Стандартный интерфейс, который понимает executor
-type IResponse interface {
+type Response interface {
 	Context() context.Context           // Возвращает контекст запроса
 	Request() (*request.Request, error) // Возвращает объект API запроса
 	Body() []byte                       // Возвращает тело ответа в байтах

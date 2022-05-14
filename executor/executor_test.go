@@ -16,7 +16,7 @@ type MessagepackParser struct {
 	Parsed bool
 }
 
-func (v *MessagepackParser) Parse(httpResponse *http.Response) (response.IResponse, error) {
+func (v *MessagepackParser) Parse(httpResponse *http.Response) (response.Response, error) {
 	v.Parsed = true
 	return response.NewUnknown(httpResponse), nil
 }

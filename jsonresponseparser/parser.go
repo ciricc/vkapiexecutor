@@ -6,10 +6,10 @@ import (
 	response "github.com/ciricc/vkapiexecutor/response"
 )
 
-// Реализует интерфейс парсера (responseparser.IResponseParser) ответа VK API с поддержкой формата JSON
+// Реализует интерфейс парсера (responseparser.ResponseParser) ответа VK API с поддержкой формата JSON
 type JsonResponseParser struct{}
 
 // Парсит ответ в формате JSON
-func (*JsonResponseParser) Parse(req *http.Response) (response.IResponse, error) {
+func (*JsonResponseParser) Parse(req *http.Response) (response.Response, error) {
 	return NewApiJsonResponse(req), nil
 }

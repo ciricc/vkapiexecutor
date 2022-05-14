@@ -150,9 +150,9 @@ func (v *Request) HttpRequest(httpMethod string) (*http.Request, error) {
 
 /* Добавляет текущий запрос в контекст по внутреннему ключу
    ctx := context.Background()
-   ctx = req.SetContextKey(ctx)
+   ctx = req.SetContextValue(ctx)
    request.FromContext(ctx)
 */
-func (v *Request) SetContextKey(ctx context.Context) context.Context {
+func (v *Request) SetContextValue(ctx context.Context) context.Context {
 	return context.WithValue(ctx, requestContextKey{}, v)
 }
