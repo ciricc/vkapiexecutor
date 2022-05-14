@@ -42,3 +42,42 @@ func copyReq(origin *request.Request) *request.Request {
 	return &r
 }
 ```
+
+## Лимитирование запросов
+Избегайте ошибок работы из-за превышения количества запросов в секунду.
+
+```go
+import (
+	"github.com/ciricc/vkapiexecutor/executor"
+	"github.com/ciricc/vkapiexecutor/limiter"
+	"github.com/ciricc/vkapiexecutor/request"
+)
+
+// 2 запроса в секунду
+reqLimiter := limiter.New(2, time.Hour, time.Hour)
+
+exec := executor.New()
+exec.HandleApiRequest(reqLimiter.Handle())
+
+params := request.NewParams()
+params.AccessToken = token
+
+req := request.New().Method("users.get").Params(params)
+
+wg := sync.WaitGroup{}
+
+for i := 0; i < 100; i++ {
+	wg.Add(1)
+	go (func() {
+		defer wg.Done()
+		res, err := exec.DoRequest(req)
+		if err != nil {
+			panic(fmt.Errorf("request error: %w", err))
+		} else {
+			log.Println("result", res)
+		}
+	})()
+}
+
+wg.Wait()
+```
