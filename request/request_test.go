@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/ciricc/vkapiexecutor/request"
@@ -313,5 +314,23 @@ func TestRequest(t *testing.T) {
 		if blocked {
 			t.Errorf("not unblocked")
 		}
+	})
+
+	t.Run("concurrently access to one request", func(t *testing.T) {
+		req := request.New()
+		wg := sync.WaitGroup{}
+		for i := 0; i < 100000; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				req.Method("users.gets")
+				req.GetHeaders() // do not change headers on concurrency without mutexes
+				req.GetParams()  // do not change params on concurrency without mutexes
+				req.GetMethod()
+				req.GetRequestUrl()
+				req.HttpRequestGet()
+			}()
+		}
+		wg.Wait()
 	})
 }

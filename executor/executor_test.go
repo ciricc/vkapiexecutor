@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -316,5 +317,20 @@ func TestExecutor(t *testing.T) {
 		if err != nil && res != nil {
 			t.Errorf("not blocked request")
 		}
+	})
+
+	t.Run("concurrently use one request in one executor", func(t *testing.T) {
+		req := request.New()
+		wg := sync.WaitGroup{}
+		exec := executor.New()
+		for i := 0; i < 25; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				req.Method("users.get")
+				exec.DoRequest(req) // yes
+			}()
+		}
+		wg.Wait()
 	})
 }
