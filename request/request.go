@@ -13,6 +13,9 @@ import (
 // URL путь к VK API
 var DefaultBaseRequestUrl = "https://api.vk.com/method/"
 
+// Тип содержимого запроса по умолчанию
+const DefaultContentTypeHeaderValue = "application/x-www-form-urlencoded"
+
 type requestContextKey struct{}
 
 // Объект запроса к API ВКонткте
@@ -24,10 +27,12 @@ type Request struct {
 
 // Создает новый API запрос
 func New() *Request {
-	return &Request{
+	r := &Request{
 		headers: http.Header{},
 		params:  NewParams(),
 	}
+	r.setContentTypeHeader()
+	return r
 }
 
 // Попытается найти объект запроса в контексте по ключу и, если он есть, вернет его
@@ -38,10 +43,9 @@ func FromContext(ctx context.Context) (*Request, error) {
 	return nil, fmt.Errorf("api request not found in context")
 }
 
-// SetMethod устанавливает метод VK API
-func (v *Request) Method(methodName string) *Request {
+// Устанавливает метод VK API и возвращает копию новый запрос
+func (v *Request) Method(methodName string) {
 	v.method = methodName
-	return v
 }
 
 // Method возвращает текущий метод запроса
@@ -50,9 +54,8 @@ func (v *Request) GetMethod() string {
 }
 
 // SetParams устанавливает параметры запроса. Глобальные значения при этом не перезаписываются
-func (v *Request) Params(params *Params) *Request {
+func (v *Request) Params(params *Params) {
 	v.params = params
-	return v
 }
 
 // Params возвращает текущий объект параетров
@@ -65,27 +68,27 @@ func (v *Request) GetHeaders() http.Header {
 	return v.headers
 }
 
-/* SetHeaders устанавливает заголовки, полностью перезаписывает текущие заголовки
+/* Устанавливает заголовки, полностью перезаписывает текущие заголовки
 Заголовок Content-Type при этом не изменяется, так как Request гарантирует одинаковый формат содержимого
 */
-func (v *Request) Headers(headers http.Header) *Request {
+func (v *Request) Headers(headers http.Header) {
 	v.headers = headers
-	return v
+	v.setContentTypeHeader()
 }
 
 // Сериализирует объект запроса в строку для удобного отображения в логах
 func (v *Request) String() string {
-	return fmt.Sprintf("url: %q\nmethod: %q\nheaders: %v\nparams: %v", DefaultBaseRequestUrl, v.method, v.headers, v.params)
+	return fmt.Sprintf("url: %q\nmethod: %q\nheaders: %v\nparams: %q", DefaultBaseRequestUrl, v.method, v.headers, v.params)
 }
 
 /* Расширяет текущие заголовки.
    При этом, значение ключа будет перезаписано, если оно уже есть.
 */
-func (v *Request) AppendHeaders(headers http.Header) *Request {
+func (v *Request) AppendHeaders(headers http.Header) {
 	for key, val := range headers {
 		v.headers[key] = val
 	}
-	return v
+	v.setContentTypeHeader()
 }
 
 /* Возвращает URL запроса без параметров.
@@ -110,6 +113,13 @@ func (v *Request) HttpRequestGet() (*http.Request, error) {
 	return v.HttpRequest("GET")
 }
 
+// Устанавливает заголовок content-type
+func (v *Request) setContentTypeHeader() {
+	if v.headers.Get("content-type") != DefaultContentTypeHeaderValue {
+		v.headers.Set("Content-Type", DefaultContentTypeHeaderValue)
+	}
+}
+
 /* Возвращает объект http.Request данного API запроса стандартной библиотеки net/http
    По умолчанию все запросы используют заголовок Content-Type: application/x-www-form-urlencoded
 
@@ -126,9 +136,7 @@ func (v *Request) HttpRequest(httpMethod string) (*http.Request, error) {
 	req := http.Request{
 		Method: httpMethod,
 		URL:    requestUrl,
-		Header: http.Header{
-			"Content-Type": {"application/x-www-form-urlencoded"},
-		},
+		Header: v.headers,
 	}
 
 	if v.params != nil {
@@ -136,12 +144,6 @@ func (v *Request) HttpRequest(httpMethod string) (*http.Request, error) {
 			req.URL.RawQuery = v.params.String()
 		} else {
 			req.Body = io.NopCloser(bytes.NewBuffer([]byte(v.params.String())))
-		}
-	}
-
-	for key, val := range v.headers {
-		if _, ok := req.Header[key]; !ok {
-			req.Header[key] = val
 		}
 	}
 

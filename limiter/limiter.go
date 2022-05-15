@@ -35,7 +35,7 @@ func New(rps int, limiterExpiration time.Duration, cacheCleanupInterval time.Dur
 // Возвращает функцию middleware для пакета executor
 func (v *Limiter) Handle() executor.ApiRequestHandler {
 	return func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
-		token := req.GetParams().AccessToken
+		token := req.GetParams().GetAccessToken()
 		if token != "" {
 			var limiter *rate.Limiter
 			if savedLimiter, ok := v.limitersCache.Get(token); ok {

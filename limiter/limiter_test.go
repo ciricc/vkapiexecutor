@@ -28,10 +28,11 @@ func TestLimiter(t *testing.T) {
 
 		for i := 0; i < 10000; i++ {
 			reqParams := request.NewParams()
-			reqParams.AccessToken = "abc"
+			reqParams.AccessToken("abc")
 
 			req := request.New()
 			req.Params(reqParams)
+
 			handleFunc(func(ctx context.Context, _ *request.Request) error {
 				if ctxDone {
 					atomic.AddInt32(&completedRequests, 1)

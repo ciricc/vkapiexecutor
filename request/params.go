@@ -1,104 +1,124 @@
 package request
 
 import (
-	"fmt"
 	"net/url"
-
-	"github.com/gorilla/schema"
 )
 
-// Параметры запроса к API VK
-// Включает в себя как базовые параметры, которые встречаются во всех методах,
-// так и дополнительные параметры.
+var AccessTokenParamKey = "access_token"
+var VersionParamKey = "v"
+var LangParamKey = "lang"
+var DeviceIdParamKey = "device_id"
+
+/* Параметры запроса к API VK
+   Включает в себя как базовые параметры, которые встречаются во всех методах,
+   так и дополнительные параметры.
+*/
 type Params struct {
-	Version          string     `schema:"v"`            // Версия API, обязательный параметр
-	DeviceId         string     `schema:"device_id"`    // Идентификатор устройства, используется официальными клиентами ВКонтакте
-	AccessToken      string     `schema:"access_token"` // Токен доступа аккаунта, используется в большинстве запросов
-	Lang             string     `schema:"lang"`         // Язык работы с API
-	additionalParams url.Values `schema:"-"`            // Расширенные параметры запроса
-	removeBlanks     bool       `schema:"-"`            // Нужно ли удалять ключи с пустыми значениями при сериализации, по умолчанию - false, всегда задавайте самостоятельно как при декодировании из URL, так и при создании нового объекта
+	params       url.Values // Мэп параметров запроса
+	RemoveBlanks bool       // Нужно ли удалять ключи с пустыми значениями при сериализации, по умолчанию - false, всегда задавайте самостоятельно как при декодировании из URL, так и при создании нового объекта
 }
 
+// Возвращает объект параметров
 func NewParams() *Params {
-	return &Params{
-		Lang:             "ru",
-		Version:          "5.141",
-		additionalParams: url.Values{},
+
+	p := &Params{
+		params: url.Values{},
 	}
+
+	p.AccessToken("")
+	p.Version("5.131")
+	p.DeviceId("")
+	p.Lang("en")
+
+	return p
 }
 
 // Создает объект параметров из url значений или из произвольного map[string][]string
-func NewParamsFromUrl(url url.Values) (*Params, error) {
+func NewParamsFromUrl(url url.Values) *Params {
 	p := NewParams()
-	p.additionalParams = url
-
-	err := schema.NewDecoder().Decode(p, url)
-	if err != nil {
-		return nil, fmt.Errorf("decode params error: %w", err)
-	}
-
-	return p, nil
-}
-
-// Указывает, нужно ли удалять пустые значения из параметров при сериализации запроса в строку
-func (v *Params) RemoveBlanks(remove bool) {
-	v.removeBlanks = remove
-}
-
-// Возвращает текущее значение RemoveBlanks
-func (v *Params) GetRemoveBlanks() bool {
-	return v.removeBlanks
-}
-
-// Добавляет новый ключ к уже существующим, аналогично url.Values{}.Add(key, val)
-func (v *Params) Add(key, val string) {
-	v.additionalParams.Add(key, val)
+	p.params = url
+	return p
 }
 
 // Перезаписывает ключ существующих параметров, аналогично url.Values{}.Set(key, val)
-func (v *Params) Set(key, val string) {
-	v.additionalParams.Set(key, val)
+func (v Params) Set(key, val string) {
+	v.params.Set(key, val)
 }
 
-// Сериализует параметры в строку url.Values{}.Encode()
+// Возвращает значение праметра по ключу, аналогично url.Values{}.Get(key)
+func (v *Params) Get(key string) string {
+	return v.params.Get(key)
+}
+
+// Возвращает информацию о том, есть ли в параметрах значение по указанному ключу
+func (v *Params) Has(key string) bool {
+	return v.params.Has(key)
+}
+
+// Удаляет значение параметра
+func (v Params) Del(key string) {
+	v.params.Del(key)
+}
+
+// Сериализует параметры в строку, предварительно вызывая метод params.ComposeValues()
 func (v *Params) String() string {
-	return v.ComposeValues().Encode()
+	v.ComposeValues()
+	return v.params.Encode()
 }
 
-// Собирает глобальные параметры и дополнительные в один map
-// Глобальные параметры при этом считаются приоритетными
-// Удаляет пустые строки, если RemoveBlanks() == true
-func (v *Params) ComposeValues() url.Values {
-	params := url.Values{}
-	schema.NewEncoder().Encode(v, params)
+// Устанавливает токен доступа
+func (v Params) AccessToken(token string) {
+	v.Set(AccessTokenParamKey, token)
+}
 
-	for key, val := range v.additionalParams {
-		if _, ok := params[key]; !ok {
-			params[key] = val
-		}
+// Возвращает параметр токена доступа
+func (v *Params) GetAccessToken() string {
+	return v.Get(AccessTokenParamKey)
+}
+
+// Устанавливает версию API
+func (v Params) Version(version string) {
+	v.Set(VersionParamKey, version)
+}
+
+// Возвращает версию
+func (v *Params) GetVersion() string {
+	return v.Get(VersionParamKey)
+}
+
+// Устанавливает язык
+func (v Params) Lang(lang string) {
+	v.Set(LangParamKey, lang)
+}
+
+// Возвращает язык
+func (v *Params) GetLang() string {
+	return v.Get(LangParamKey)
+}
+
+// Устанавливает идентификатор устройства
+func (v Params) DeviceId(deviceId string) {
+	v.Set(DeviceIdParamKey, deviceId)
+}
+
+// Возвращает идентификатор устройства
+func (v *Params) GetDeviceId() string {
+	return v.Get(DeviceIdParamKey)
+}
+
+/* Удаляет параметры, если задана настройка удаление пустых значений.
+ */
+func (v *Params) ComposeValues() {
+	if v.RemoveBlanks {
+		v.clearBlanks(v.params)
 	}
-
-	if v.removeBlanks {
-		params = v.clearBlanks(params)
-	}
-
-	return params
 }
 
 // Удалят из параметров ключи с пустыми значениями
-func (v *Params) clearBlanks(params url.Values) url.Values {
-	resultParams := url.Values{}
-
-	for key, val := range params {
-		if len(val) > 0 {
-			for _, v := range val {
-				if v != "" {
-					resultParams[key] = val
-					break
-				}
-			}
+func (v *Params) clearBlanks(params url.Values) {
+	for key := range params {
+		if params.Get(key) == "" {
+			delete(params, key)
 		}
 	}
-
-	return resultParams
 }

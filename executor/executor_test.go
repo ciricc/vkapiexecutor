@@ -25,18 +25,24 @@ func TestExecutor(t *testing.T) {
 	apiExecutor := executor.New()
 
 	t.Run("api endpoint", func(t *testing.T) {
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
+
 		res, err := apiExecutor.DoRequestCtx(context.Background(), req)
 		if res == nil && err != nil {
 			t.Errorf("http error: %s", err)
 		}
+
 		expectedUrl := "https://api.vk.com/method/users.get"
 		if res.HttpResponse().Request.URL.String() != expectedUrl {
 			t.Errorf("expected api request url: %q but got %q", expectedUrl, res.HttpResponse().Request.URL.String())
 		}
 	})
+
 	t.Run("close request", func(t *testing.T) {
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
+
 		res, err := apiExecutor.DoRequestCtx(context.Background(), req)
 		if err != nil && res == nil {
 			t.Error(err)
@@ -47,7 +53,9 @@ func TestExecutor(t *testing.T) {
 	})
 
 	t.Run("response is not nil when http error is nil", func(t *testing.T) {
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
+
 		res, err := apiExecutor.DoRequestCtx(context.Background(), req)
 		if err != nil {
 			switch errBody := err.(type) {
@@ -67,7 +75,9 @@ func TestExecutor(t *testing.T) {
 	})
 
 	t.Run("execute timeout", func(t *testing.T) {
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
+
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancel()
 		res, _ := apiExecutor.DoRequestCtx(ctx, req)
@@ -77,7 +87,9 @@ func TestExecutor(t *testing.T) {
 	})
 
 	t.Run("get request from context", func(t *testing.T) {
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
+
 		res, err := apiExecutor.DoRequestCtx(context.Background(), req)
 		if err != nil {
 			if _, ok := err.(*response.Error); !ok {
@@ -94,7 +106,8 @@ func TestExecutor(t *testing.T) {
 	})
 
 	t.Run("test api middlewares", func(t *testing.T) {
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
 
 		madeTest2 := false
 		madeTest1 := false
@@ -139,7 +152,8 @@ func TestExecutor(t *testing.T) {
 	})
 
 	t.Run("clear api middlwares", func(t *testing.T) {
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
 
 		callDeletedMiddleware := false
 		apiExecutor.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
@@ -162,7 +176,9 @@ func TestExecutor(t *testing.T) {
 	t.Run("middleware returns error", func(t *testing.T) {
 		middlewareError := fmt.Errorf("middleware error")
 
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
+
 		apiExecutorNew := executor.New()
 
 		apiExecutorNew.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
@@ -176,7 +192,8 @@ func TestExecutor(t *testing.T) {
 	})
 
 	t.Run("middleware for http request", func(t *testing.T) {
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
 
 		madeTest2 := false
 		madeTest1 := false
@@ -216,7 +233,8 @@ func TestExecutor(t *testing.T) {
 	})
 
 	t.Run("clear http request middleware handlers", func(t *testing.T) {
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
 		callHttpMiddleware := false
 
 		apiExecutor.HandleHttpRequest(func(next executor.HttpRequestHandlerNext, req *http.Request) error {
@@ -237,7 +255,9 @@ func TestExecutor(t *testing.T) {
 	})
 
 	t.Run("middleware changes http request credentials", func(t *testing.T) {
-		req := request.New().Method("users.get")
+		req := request.New()
+		req.Method("users.get")
+
 		defer apiExecutor.ResetHttpRequestHandlers()
 
 		apiExecutor.HandleHttpRequest(func(next executor.HttpRequestHandlerNext, req *http.Request) error {
@@ -258,7 +278,8 @@ func TestExecutor(t *testing.T) {
 
 	t.Run("custom response parser", func(t *testing.T) {
 
-		req := request.New().Method("users.get.msgpack")
+		req := request.New()
+		req.Method("users.get.msgpack")
 
 		apiExecutorCustomParser := executor.New()
 		msgPackParser := MessagepackParser{}
