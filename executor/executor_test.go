@@ -295,4 +295,26 @@ func TestExecutor(t *testing.T) {
 			t.Error("not parsed by custom parser")
 		}
 	})
+
+	t.Run("middleware which stops request", func(t *testing.T) {
+		params := request.NewParams()
+
+		req := request.New()
+		req.Params(params)
+
+		exec := executor.New()
+
+		exec.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
+			if req.GetMethod() == "" || req.GetParams().GetAccessToken() == "" {
+				req.Block(true)
+			}
+			return next(ctx, req)
+		})
+
+		res, err := exec.DoRequest(req)
+
+		if err != nil && res != nil {
+			t.Errorf("not blocked request")
+		}
+	})
 }

@@ -81,6 +81,17 @@ func (v *Executor) DoRequestCtx(ctx context.Context, req *request.Request) (resp
 	return v.DoRequestCtxParser(ctx, req, v.ResponseParser)
 }
 
+// Возвращает причину, по которой нельзя выполнить запрос
+func (v *Executor) getCantDoRequestReason(req *request.Request) error {
+	if blocked, reason := req.IsBlock(); blocked {
+		if reason != nil {
+			return fmt.Errorf("request blocked: %w", reason)
+		}
+		return fmt.Errorf("request blocked")
+	}
+	return nil
+}
+
 /*
    Выполняет запрос к VK API.
    Используйте ctx для передачи значений в middleware или для создания таймаутов на выполнение запроса
@@ -105,6 +116,11 @@ func (v *Executor) DoRequestCtxParser(ctx context.Context, req *request.Request,
 
 	if req == nil {
 		return nil, fmt.Errorf("after middleware chanining input request is empty")
+	}
+
+	err = v.getCantDoRequestReason(req)
+	if err != nil {
+		return nil, fmt.Errorf("can't do request: %w", err)
 	}
 
 	reqCtx := req.SetContextValue(ctx)

@@ -20,9 +20,11 @@ type requestContextKey struct{}
 
 // Объект запроса к API ВКонткте
 type Request struct {
-	method  string      // Метод VK API
-	params  *Params     // Параметры запроса
-	headers http.Header // HTTP заголовки запроса. По умолчанию в запросе есть один загловок - Content-Type, его изменить нельзя
+	method      string      // Метод VK API
+	params      *Params     // Параметры запроса
+	headers     http.Header // HTTP заголовки запроса. По умолчанию в запросе есть один загловок - Content-Type, его изменить нельзя
+	block       bool
+	blockReason error
 }
 
 // Создает новый API запрос
@@ -162,4 +164,23 @@ func (v *Request) HttpRequest(httpMethod string) (*http.Request, error) {
 */
 func (v *Request) SetContextValue(ctx context.Context) context.Context {
 	return context.WithValue(ctx, requestContextKey{}, v)
+}
+
+// Блокирует выполнение запроса
+func (v *Request) Block(block bool) {
+	v.block = block
+	if !block {
+		v.blockReason = nil
+	}
+}
+
+// Блокирует выополнение запроса с причиной
+func (v *Request) BlockReason(reason error) {
+	v.block = true
+	v.blockReason = reason
+}
+
+// Возвращает информацию о том, нужно либ локировать выполнение запроса
+func (v *Request) IsBlock() (bool, error) {
+	return v.block, v.blockReason
 }
