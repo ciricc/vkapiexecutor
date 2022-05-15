@@ -321,16 +321,24 @@ func TestExecutor(t *testing.T) {
 
 	t.Run("concurrently use one request in one executor", func(t *testing.T) {
 		req := request.New()
-		wg := sync.WaitGroup{}
 		exec := executor.New()
+
+		req.Method("users.get") // it's ok, because nothing changes in concurrency
+
+		wg := sync.WaitGroup{}
 		for i := 0; i < 25; i++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				req.Method("users.get")
-				exec.DoRequest(req) // yes
+
+				// WARNING
+				req.Method("users.get") // DO NOT do this in concurrently system calls with different methods without mutexes
+
+				exec.DoRequest(req) // it's ok, will return response only for this request execution
+
 			}()
 		}
+
 		wg.Wait()
 	})
 }

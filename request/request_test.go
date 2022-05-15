@@ -113,7 +113,7 @@ func TestRequest(t *testing.T) {
 	t.Run("built http request same with built-in methods", func(t *testing.T) {
 		req := request.New()
 
-		httpReq, err := req.HttpRequest("GET")
+		httpReq, err := req.HttpRequestGet()
 		if err != nil {
 			t.Error(err)
 		}
@@ -127,7 +127,7 @@ func TestRequest(t *testing.T) {
 			t.Errorf("http get requests different: custom: %v\nbuilt-in: %v", httpReq, httpReqBuiltIn)
 		}
 
-		httpReq, err = req.HttpRequest("POST")
+		httpReq, err = req.HttpRequestPost()
 		if err != nil {
 			t.Error(err)
 		}
@@ -275,7 +275,7 @@ func TestRequest(t *testing.T) {
 
 		req.AppendHeaders(nil) // will be ok, cause in range cycle
 		req.Headers(nil)
-		req.HttpRequest("GET") // check no panic
+		req.HttpRequestGet() // check no panic
 
 		if req.GetHeaders() == nil {
 			t.Errorf("headers is nil")
@@ -332,5 +332,42 @@ func TestRequest(t *testing.T) {
 			}()
 		}
 		wg.Wait()
+	})
+
+	t.Run("same get requests pointers", func(t *testing.T) {
+		req := request.New()
+
+		httpReq1, err := req.HttpRequestGet()
+		if err != nil {
+			t.Error(err)
+		}
+
+		httpReq2, err := req.HttpRequestGet()
+		if err != nil {
+			t.Error(err)
+		}
+
+		if httpReq1 != httpReq2 {
+			t.Errorf("different requests: %v, %v", httpReq1, httpReq2)
+		}
+
+	})
+
+	t.Run("same post requests pointers", func(t *testing.T) {
+		req := request.New()
+
+		httpReq1, err := req.HttpRequestPost()
+		if err != nil {
+			t.Error(err)
+		}
+
+		httpReq2, err := req.HttpRequestPost()
+		if err != nil {
+			t.Error(err)
+		}
+
+		if httpReq1 != httpReq2 {
+			t.Errorf("different requests: %v, %v", httpReq1, httpReq2)
+		}
 	})
 }
