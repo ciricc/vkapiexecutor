@@ -262,4 +262,21 @@ func TestRequest(t *testing.T) {
 			t.Errorf("not added authorization header")
 		}
 	})
+
+	t.Run("nil values set", func(t *testing.T) {
+		req := request.New()
+		req.Params(nil)
+
+		if req.GetParams() != nil {
+			t.Errorf("params is not nil")
+		}
+
+		req.AppendHeaders(nil) // will be ok, cause in range cycle
+		req.Headers(nil)
+		req.HttpRequest("GET") // check no panic
+
+		if req.GetHeaders() == nil {
+			t.Errorf("headers is nil")
+		}
+	})
 }

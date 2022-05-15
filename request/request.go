@@ -65,6 +65,9 @@ func (v *Request) GetParams() *Params {
 
 // Headers возвращает копию текущих заголовков запроса
 func (v *Request) GetHeaders() http.Header {
+	if v.headers == nil {
+		v.headers = make(http.Header)
+	}
 	return v.headers
 }
 
@@ -78,16 +81,18 @@ func (v *Request) Headers(headers http.Header) {
 
 // Сериализирует объект запроса в строку для удобного отображения в логах
 func (v *Request) String() string {
-	return fmt.Sprintf("url: %q\nmethod: %q\nheaders: %v\nparams: %q", DefaultBaseRequestUrl, v.method, v.headers, v.params)
+	return fmt.Sprintf("url: %q\nmethod: %q\nheaders: %v\nparams: %q", DefaultBaseRequestUrl, v.GetMethod(), v.GetHeaders(), v.GetParams())
 }
 
 /* Расширяет текущие заголовки.
    При этом, значение ключа будет перезаписано, если оно уже есть.
 */
 func (v *Request) AppendHeaders(headers http.Header) {
+	requestHeaders := v.GetHeaders()
 	for key, val := range headers {
-		v.headers[key] = val
+		requestHeaders[key] = val
 	}
+
 	v.setContentTypeHeader()
 }
 
@@ -115,8 +120,8 @@ func (v *Request) HttpRequestGet() (*http.Request, error) {
 
 // Устанавливает заголовок content-type
 func (v *Request) setContentTypeHeader() {
-	if v.headers.Get("content-type") != DefaultContentTypeHeaderValue {
-		v.headers.Set("Content-Type", DefaultContentTypeHeaderValue)
+	if v.GetHeaders().Get("content-type") != DefaultContentTypeHeaderValue {
+		v.GetHeaders().Set("Content-Type", DefaultContentTypeHeaderValue)
 	}
 }
 
@@ -136,7 +141,7 @@ func (v *Request) HttpRequest(httpMethod string) (*http.Request, error) {
 	req := http.Request{
 		Method: httpMethod,
 		URL:    requestUrl,
-		Header: v.headers,
+		Header: v.GetHeaders(),
 	}
 
 	if v.params != nil {
