@@ -5,8 +5,11 @@ package response
 */
 type Error struct {
 	error
-	message string
-	intCode int
+	message     string
+	intCode     int
+	CaptchaSid  string
+	CaptchaImg  string
+	RedirectUri string
 }
 
 func NewError(message string, intCode int) *Error {

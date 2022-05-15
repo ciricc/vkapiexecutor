@@ -261,7 +261,7 @@ func TestExecutor(t *testing.T) {
 		defer apiExecutor.ResetHttpRequestHandlers()
 
 		apiExecutor.HandleHttpRequest(func(next executor.HttpRequestHandlerNext, req *http.Request) error {
-			req.URL.Host = "example.com"
+			req.URL.Host = "api.vkontakte.ru"
 			return next(req)
 		})
 
@@ -271,7 +271,7 @@ func TestExecutor(t *testing.T) {
 		}
 
 		responseLocation := res.HttpResponse().Request.URL
-		if responseLocation.Host != "example.com" {
+		if responseLocation.Host != "api.vkontakte.ru" {
 			t.Errorf("http middleware nothing changed")
 		}
 	})

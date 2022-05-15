@@ -11,5 +11,6 @@ type JsonResponseParser struct{}
 
 // Парсит ответ в формате JSON
 func (*JsonResponseParser) Parse(req *http.Response) (response.Response, error) {
-	return NewApiJsonResponse(req), nil
+	jsonResponse := NewApiJsonResponse(req)
+	return jsonResponse, jsonResponse.ValidateJson()
 }
