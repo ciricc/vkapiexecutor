@@ -1,7 +1,6 @@
 package response_test
 
 import (
-	"context"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -59,58 +58,6 @@ func TestResponseWithoutContext(t *testing.T) {
 		res := response.NewUnknown(httpRes)
 		if res.HttpResponse() != httpRes {
 			t.Errorf("different http response")
-		}
-	})
-
-	t.Run("request will bi nil, cause no context value", func(t *testing.T) {
-		res := response.NewUnknown(httpRes)
-		_, err := res.Request()
-		if err == nil {
-			t.Errorf("found request, but not expected")
-		}
-	})
-}
-
-func TestResponseWithContext(t *testing.T) {
-	req := request.New()
-	httpReq, err := req.HttpRequestGet()
-
-	if err != nil {
-		t.Error(err)
-	}
-
-	ctx := req.SetContextValue(context.Background())
-	httpReq = httpReq.WithContext(ctx)
-
-	httpRes, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		t.Error(err)
-	}
-
-	defer httpRes.Body.Close()
-
-	t.Run("check context same", func(t *testing.T) {
-		res := response.NewUnknown(httpRes)
-		if res.Context() != ctx {
-			t.Errorf("different context")
-		}
-	})
-
-	t.Run("check request got from context", func(t *testing.T) {
-		res := response.NewUnknown(httpRes)
-		if _, err := res.Request(); err != nil {
-			t.Error(err)
-		}
-	})
-
-	t.Run("same request from context", func(t *testing.T) {
-		res := response.NewUnknown(httpRes)
-		ctxReq, err := res.Request()
-		if err != nil {
-			t.Error(err)
-		}
-		if req != ctxReq {
-			t.Errorf("diffrent requests")
 		}
 	})
 }

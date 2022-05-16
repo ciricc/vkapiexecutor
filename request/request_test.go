@@ -2,7 +2,6 @@ package request_test
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"log"
@@ -41,21 +40,6 @@ func TestRequest(t *testing.T) {
 		log.Println(req.String())
 		if len(req.String()) == 0 {
 			t.Errorf("serialized request empty")
-		}
-	})
-
-	t.Run("request setting context value correctly", func(t *testing.T) {
-		req := request.New()
-		ctx := context.Background()
-		ctx = req.SetContextValue(ctx)
-
-		ctxReq, err := request.FromContext(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-
-		if req != ctxReq {
-			t.Error("requests are not the same")
 		}
 	})
 

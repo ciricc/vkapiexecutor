@@ -5,18 +5,17 @@ import (
 	"context"
 	"io"
 	"net/http"
-
-	"github.com/ciricc/vkapiexecutor/request"
 )
 
 // Стандартный интерфейс, который понимает executor
 type Response interface {
-	Context() context.Context           // Возвращает контекст запроса
-	Request() (*request.Request, error) // Возвращает объект API запроса
-	Body() []byte                       // Возвращает тело ответа в байтах
-	String() string                     // Возвращает тело ответа в строковом представлении
-	Error() error                       // Возвращает информацию об ошибке выполнения запроса
-	HttpResponse() *http.Response       // Возвращает объект HTTP ответа
+	Context() context.Context // Возвращает контекст запроса
+	Body() []byte                 // Возвращает тело ответа в байтах
+	String() string               // Возвращает тело ответа в строковом представлении
+	Error() error                 // Возвращает информацию об ошибке выполнения запроса
+	HttpResponse() *http.Response // Возвращает объект HTTP ответа
+	Renew(renew bool)
+	IsRenew() bool
 }
 
 /* Реализация неизвестного формата ответа
@@ -25,6 +24,7 @@ type Response interface {
 type UnknownResponse struct {
 	response  *http.Response
 	bodyBytes []byte
+	renew     bool
 }
 
 func NewUnknown(httpResponse *http.Response) *UnknownResponse {
@@ -39,11 +39,6 @@ func NewUnknown(httpResponse *http.Response) *UnknownResponse {
 // Возвращает заданный контекст, взятый из запроса request.Request
 func (v *UnknownResponse) Context() context.Context {
 	return v.response.Request.Context()
-}
-
-// Возвращает ссылку на запрос
-func (v *UnknownResponse) Request() (*request.Request, error) {
-	return request.FromContext(v.Context())
 }
 
 // Возвращает байты тела ответа сервера
@@ -67,4 +62,14 @@ func (v *UnknownResponse) Error() error {
 // Возвращает объект http ответа сервера
 func (v *UnknownResponse) HttpResponse() *http.Response {
 	return v.response
+}
+
+// Просит executor выполнить запрос и создать новый объект Response после выполнения
+func (v *UnknownResponse) Renew(renew bool) {
+	v.renew = renew
+}
+
+// Возвращает информацию о том, нужно ли выполнить запрос снова и пересоздать объект ответа
+func (v *UnknownResponse) IsRenew() bool {
+	return v.renew
 }

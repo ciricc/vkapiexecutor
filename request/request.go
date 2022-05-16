@@ -2,7 +2,6 @@ package request
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -39,13 +38,13 @@ func New() *Request {
 	return r
 }
 
-// Попытается найти объект запроса в контексте по ключу и, если он есть, вернет его
-func FromContext(ctx context.Context) (*Request, error) {
-	if val := ctx.Value(requestContextKey{}); val != nil {
-		return val.(*Request), nil
-	}
-	return nil, fmt.Errorf("api request not found in context")
-}
+// // Попытается найти объект запроса в контексте по ключу и, если он есть, вернет его
+// func FromContext(ctx context.Context) (*Request, error) {
+// 	if val := ctx.Value(requestContextKey{}); val != nil {
+// 		return val.(*Request), nil
+// 	}
+// 	return nil, fmt.Errorf("api request not found in context")
+// }
 
 // Устанавливает метод VK API и возвращает копию новый запрос
 func (v *Request) Method(methodName string) {
@@ -184,14 +183,14 @@ func (v *Request) buildHttpRequest(method string) (*http.Request, error) {
 	return req, nil
 }
 
-/* Добавляет текущий запрос в контекст по внутреннему ключу
-   ctx := context.Background()
-   ctx = req.SetContextValue(ctx)
-   request.FromContext(ctx)
-*/
-func (v *Request) SetContextValue(ctx context.Context) context.Context {
-	return context.WithValue(ctx, requestContextKey{}, v)
-}
+// /* Добавляет текущий запрос в контекст по внутреннему ключу
+//    ctx := context.Background()
+//    ctx = req.SetContextValue(ctx)
+//    request.FromContext(ctx)
+// */
+// func (v *Request) SetContextValue(ctx context.Context) context.Context {
+// 	return context.WithValue(ctx, requestContextKey{}, v)
+// }
 
 // Блокирует выполнение запроса
 func (v *Request) Block(block bool) {

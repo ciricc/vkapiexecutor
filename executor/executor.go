@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/ciricc/vkapiexecutor/jsonresponseparser"
 	"github.com/ciricc/vkapiexecutor/request"
@@ -11,11 +12,16 @@ import (
 	"github.com/ciricc/vkapiexecutor/responseparser"
 )
 
+var DefaultMaxRequestTries = 50
+
 type ApiRequestHandlerNext func(ctx context.Context, req *request.Request) error
 type ApiRequestHandler func(next ApiRequestHandlerNext, ctx context.Context, req *request.Request) error
 
 type HttpRequestHandlerNext func(req *http.Request) error
 type HttpRequestHandler func(next HttpRequestHandlerNext, req *http.Request) error
+
+type ApiResponseHandlerNext func(res response.Response) error
+type ApiResponseHandler func(next ApiResponseHandlerNext, res response.Response) error
 
 // Отвечает за выполнение API запросов ВКонтакте
 type Executor struct {
@@ -23,7 +29,12 @@ type Executor struct {
 	ResponseParser    responseparser.Parser // Парсер ответа ВКонтакте. Можно переназначить для парсинга других форматов
 	apiRequestHandle  ApiRequestHandler     // Последний добавленный обработчик API запроса
 	httpRequestHandle HttpRequestHandler    // Последний добавленный обработчик HTTP запроса
+	apiResponseHandle ApiResponseHandler    // Последлний добавленный обработчик API ответа
+	MaxRequestTries   int
 }
+
+type requestTryContextKey struct{} // Ключ счетчика попыток запроса в контексте
+type requestContextKey struct{}    // Ключ запроса в контексте
 
 func New() *Executor {
 	httpClient := http.Client{}
@@ -32,6 +43,8 @@ func New() *Executor {
 		ResponseParser:    &jsonresponseparser.JsonResponseParser{},
 		apiRequestHandle:  func(_ ApiRequestHandlerNext, _ context.Context, _ *request.Request) error { return nil },
 		httpRequestHandle: func(_ HttpRequestHandlerNext, _ *http.Request) error { return nil },
+		apiResponseHandle: func(next ApiResponseHandlerNext, res response.Response) error { return nil },
+		MaxRequestTries:   DefaultMaxRequestTries,
 	}
 }
 
@@ -47,6 +60,16 @@ func (v *Executor) HandleApiRequest(handler ApiRequestHandler) {
 	}
 }
 
+// Устанавливает middleware для обработки ответа VK API
+func (v *Executor) HandleApiResponse(handler ApiResponseHandler) {
+	nextHandler := v.apiResponseHandle
+	v.apiResponseHandle = func(next ApiResponseHandlerNext, res response.Response) error {
+		return handler(func(res response.Response) error {
+			return nextHandler(nil, res)
+		}, res)
+	}
+}
+
 // Отчищает очередь из middleware VK API запросов
 func (v *Executor) ResetApiRequestHandlers() {
 	v.apiRequestHandle = func(_ ApiRequestHandlerNext, _ context.Context, _ *request.Request) error { return nil }
@@ -55,6 +78,11 @@ func (v *Executor) ResetApiRequestHandlers() {
 // Отчищает очередь из middleware HTTP запросов
 func (v *Executor) ResetHttpRequestHandlers() {
 	v.httpRequestHandle = func(next HttpRequestHandlerNext, req *http.Request) error { return nil }
+}
+
+// Отчищает очередь из middleware API ответов
+func (v *Executor) ResetApiResponseHandlers() {
+	v.apiResponseHandle = func(next ApiResponseHandlerNext, res response.Response) error { return nil }
 }
 
 /* Устанавливает middleware для обработки HTTP запроса
@@ -81,17 +109,6 @@ func (v *Executor) DoRequestCtx(ctx context.Context, req *request.Request) (resp
 	return v.DoRequestCtxParser(ctx, req, v.ResponseParser)
 }
 
-// Возвращает причину, по которой нельзя выполнить запрос
-func (v *Executor) getCantDoRequestReason(req *request.Request) error {
-	if blocked, reason := req.IsBlock(); blocked {
-		if reason != nil {
-			return fmt.Errorf("request blocked: %w", reason)
-		}
-		return fmt.Errorf("request blocked")
-	}
-	return nil
-}
-
 /*
    Выполняет запрос к VK API.
    Используйте ctx для передачи значений в middleware или для создания таймаутов на выполнение запроса
@@ -114,36 +131,42 @@ func (v *Executor) DoRequestCtxParser(ctx context.Context, req *request.Request,
 		return nil, err
 	}
 
-	if req == nil {
-		return nil, fmt.Errorf("after middleware chanining input request is empty")
-	}
-
-	err = v.getCantDoRequestReason(req)
+	err = getCantDoRequestReason(req)
 	if err != nil {
 		return nil, fmt.Errorf("can't do request: %w", err)
 	}
 
-	reqCtx := req.SetContextValue(ctx)
-	httpReq, err := req.HttpRequestPost()
+	var requestTry = getRequestTryPtr(ctx)
 
+	if requestTry == nil {
+		reqTry := int32(0)
+		requestTry = &reqTry
+
+		/* Устанавливаем в контекст все необходимые данные запроса
+		   Во избежание ошибок - контекстом управляет только Executor,
+		   поэтому именно он и может получить из контекста запрос и счетчик выполнений
+		*/
+		ctx = context.WithValue(ctx, requestTryContextKey{}, requestTry)
+		ctx = context.WithValue(ctx, requestContextKey{}, req)
+	}
+
+	if atomic.LoadInt32(requestTry) >= int32(v.MaxRequestTries) {
+		return nil, fmt.Errorf("max request calls exceeded: %d", v.MaxRequestTries)
+	}
+
+	httpReq, err := req.HttpRequestPost()
 	if err != nil {
 		return nil, err
 	}
+
+	httpReq = httpReq.WithContext(ctx)
 
 	err = v.httpRequestHandle(nil, httpReq)
 	if err != nil {
 		return nil, err
 	}
 
-	if httpReq == nil {
-		return nil, fmt.Errorf("after middlewate chaining http request is empty")
-	}
-
-	if ctx, _ := request.FromContext(reqCtx); ctx == nil {
-		return nil, fmt.Errorf("after middleware chaining api request context value is nil")
-	}
-
-	httpReq = httpReq.WithContext(reqCtx)
+	addRequestTry(requestTry)
 	res, err := v.HttpClient.Do(httpReq)
 
 	if err != nil {
@@ -155,6 +178,15 @@ func (v *Executor) DoRequestCtxParser(ctx context.Context, req *request.Request,
 
 	if err != nil {
 		return nil, fmt.Errorf("parse response error: %w", err)
+	}
+
+	err = v.apiResponseHandle(nil, apiResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	if apiResponse.IsRenew() {
+		return v.DoRequestCtxParser(ctx, req, parser)
 	}
 
 	return apiResponse, apiResponse.Error()
