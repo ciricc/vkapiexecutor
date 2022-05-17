@@ -547,4 +547,16 @@ func TestExecutor(t *testing.T) {
 			t.Errorf("not using default http client")
 		}
 	})
+
+	t.Run("change default response parser", func(t *testing.T) {
+		rp := executor.DefaultResponseParser
+		defer func() {
+			executor.DefaultResponseParser = rp
+		}()
+		executor.DefaultResponseParser = &MessagepackParser{}
+		exec := executor.New()
+		if exec.ResponseParser != executor.DefaultResponseParser {
+			t.Errorf("not using default response parser")
+		}
+	})
 }

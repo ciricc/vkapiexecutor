@@ -13,6 +13,7 @@ import (
 )
 
 var DefaultMaxRequestTries = 50
+var DefaultResponseParser responseparser.Parser = &jsonresponseparser.JsonResponseParser{}
 
 type ApiRequestHandlerNext func(ctx context.Context, req *request.Request) error
 type ApiRequestHandler func(next ApiRequestHandlerNext, ctx context.Context, req *request.Request) error
@@ -39,7 +40,7 @@ type requestContextKey struct{}    // Ключ запроса в контекс�
 func New() *Executor {
 	return &Executor{
 		HttpClient:        http.DefaultClient,
-		ResponseParser:    &jsonresponseparser.JsonResponseParser{},
+		ResponseParser:    DefaultResponseParser,
 		apiRequestHandle:  func(_ ApiRequestHandlerNext, _ context.Context, _ *request.Request) error { return nil },
 		httpRequestHandle: func(_ HttpRequestHandlerNext, _ *http.Request) error { return nil },
 		apiResponseHandle: func(next ApiResponseHandlerNext, res response.Response) error { return nil },
