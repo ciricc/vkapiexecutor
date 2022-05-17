@@ -37,9 +37,8 @@ type requestTryContextKey struct{} // Ключ счетчика попыток �
 type requestContextKey struct{}    // Ключ запроса в контексте
 
 func New() *Executor {
-	httpClient := http.Client{}
 	return &Executor{
-		HttpClient:        &httpClient,
+		HttpClient:        http.DefaultClient,
 		ResponseParser:    &jsonresponseparser.JsonResponseParser{},
 		apiRequestHandle:  func(_ ApiRequestHandlerNext, _ context.Context, _ *request.Request) error { return nil },
 		httpRequestHandle: func(_ HttpRequestHandlerNext, _ *http.Request) error { return nil },

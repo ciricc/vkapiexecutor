@@ -3,7 +3,6 @@ package executor_test
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -357,7 +356,6 @@ func TestExecutor(t *testing.T) {
 
 		exec.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
 			try := executor.GetRequestTry(ctx)
-			log.Println("get request try", try)
 			if try != 0 {
 				t.Errorf("expected request try: %d, but real is: %d", 0, try)
 			}
@@ -499,8 +497,6 @@ func TestExecutor(t *testing.T) {
 		var madeRequests int32 = 0
 		var madeRequestsReal int32 = 0
 		exec.HandleApiResponse(func(next executor.ApiResponseHandlerNext, res response.Response) error {
-			log.Println("do request")
-
 			madeRequests = executor.GetRequestTry(res.Context())
 
 			if atomic.LoadInt32(&madeRequestsReal) > int32(makeTries) {
@@ -542,6 +538,13 @@ func TestExecutor(t *testing.T) {
 
 		if madeRequests != int32(makeTries) {
 			t.Errorf("expected tries: %d, but got: %d", makeTries, madeRequests)
+		}
+	})
+
+	t.Run("use default http client instead of creating new", func(t *testing.T) {
+		exec := executor.New()
+		if exec.HttpClient != http.DefaultClient {
+			t.Errorf("not using default http client")
 		}
 	})
 }
