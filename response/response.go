@@ -27,7 +27,7 @@ type UnknownResponse struct {
 }
 
 func NewUnknown(httpResponse *http.Response) *UnknownResponse {
-	bodyBytes := bytes.NewBuffer([]byte{})
+	bodyBytes := bytes.NewBuffer(make([]byte, 0))
 	io.Copy(bodyBytes, httpResponse.Body)
 	return &UnknownResponse{
 		response:  httpResponse,

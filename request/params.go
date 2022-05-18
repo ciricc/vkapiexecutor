@@ -24,9 +24,7 @@ func NewParams() *Params {
 		params: url.Values{},
 	}
 
-	p.AccessToken("")
 	p.Version("5.131")
-	p.DeviceId("")
 	p.Lang("en")
 
 	return p
@@ -44,17 +42,17 @@ func (v Params) Set(key, val string) {
 	v.params.Set(key, val)
 }
 
-// Возвращает значение праметра по ключу, аналогично url.Values{}.Get(key)
+// Возвращает значение параметра по ключу, аналогично url.Values{}.Get(key)
 func (v *Params) Get(key string) string {
 	return v.params.Get(key)
 }
 
-// Возвращает информацию о том, есть ли в параметрах значение по указанному ключу
+// Возвращает информацию о том, есть ли в параметрах значение по указанному ключу, аналогично url.Values{}.Has(key)
 func (v *Params) Has(key string) bool {
 	return v.params.Has(key)
 }
 
-// Удаляет значение параметра
+// Удаляет значение параметра, аналогично url.Values{}.Del(key)
 func (v Params) Del(key string) {
 	v.params.Del(key)
 }
@@ -80,7 +78,7 @@ func (v Params) Version(version string) {
 	v.Set(VersionParamKey, version)
 }
 
-// Возвращает версию
+// Возвращает версию API
 func (v *Params) GetVersion() string {
 	return v.Get(VersionParamKey)
 }
@@ -105,8 +103,7 @@ func (v *Params) GetDeviceId() string {
 	return v.Get(DeviceIdParamKey)
 }
 
-/* Удаляет параметры, если задана настройка удаление пустых значений.
- */
+// Удаляет пустые значения параметров, если задана настройка RemoveBlanks.
 func (v *Params) ComposeValues() {
 	if v.RemoveBlanks {
 		v.clearBlanks(v.params)

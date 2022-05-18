@@ -1,12 +1,12 @@
 package request
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 )
 
 // URL путь к VK API
@@ -82,9 +82,8 @@ func (v *Request) getHttpRequestGet() *http.Request {
 	return v.getHttpRequest
 }
 
-/* Устанавливает заголовки, полностью перезаписывает текущие заголовки
-Заголовок Content-Type при этом не изменяется, так как Request гарантирует одинаковый формат содержимого
-*/
+// Устанавливает заголовки, полностью перезаписывает текущие заголовки
+// Заголовок Content-Type при этом не изменяется, так как Request гарантирует одинаковый формат содержимого
 func (v *Request) Headers(headers http.Header) {
 	v.headers = headers
 	v.setContentTypeHeader()
@@ -95,11 +94,11 @@ func (v *Request) String() string {
 	return fmt.Sprintf("url: %q\nmethod: %q\nheaders: %v\nparams: %q", DefaultBaseRequestUrl, v.GetMethod(), v.GetHeaders(), v.GetParams())
 }
 
-/* Расширяет текущие заголовки.
-   При этом, значение ключа будет перезаписано, если оно уже есть.
-*/
+// Расширяет текущие заголовки.
+// При этом, значение ключа будет перезаписано, если оно уже есть.
 func (v *Request) AppendHeaders(headers http.Header) {
 	requestHeaders := v.GetHeaders()
+
 	for key, val := range headers {
 		requestHeaders[key] = val
 	}
@@ -138,7 +137,6 @@ func (v *Request) setContentTypeHeader() {
 
 // Возвращает объект http.Request данного API запроса стандартной библиотеки net/http
 // По умолчанию все запросы используют заголовок Content-Type: application/x-www-form-urlencoded
-//
 // request.HttpRequest("GET")
 // request.GttpRequest("POST")
 func (v *Request) buildHttpRequest(method string) (*http.Request, error) {
@@ -163,7 +161,7 @@ func (v *Request) buildHttpRequest(method string) (*http.Request, error) {
 		if method == "GET" {
 			req.URL.RawQuery = v.params.String()
 		} else {
-			req.Body = io.NopCloser(bytes.NewBuffer([]byte(v.params.String())))
+			req.Body = io.NopCloser(strings.NewReader(v.params.String()))
 		}
 	}
 

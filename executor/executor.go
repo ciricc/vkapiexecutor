@@ -15,12 +15,6 @@ import (
 var DefaultMaxRequestTries = 50
 var DefaultResponseParser responseparser.Parser = &jsonresponseparser.JsonResponseParser{}
 
-type ApiRequestHandlerNext func(ctx context.Context, req *request.Request) error
-type ApiRequestHandler func(next ApiRequestHandlerNext, ctx context.Context, req *request.Request) error
-
-type HttpRequestHandlerNext func(req *http.Request) error
-type HttpRequestHandler func(next HttpRequestHandlerNext, req *http.Request) error
-
 type ApiResponseHandlerNext func(res response.Response) error
 type ApiResponseHandler func(next ApiResponseHandlerNext, res response.Response) error
 

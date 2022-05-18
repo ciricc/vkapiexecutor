@@ -39,18 +39,22 @@ func (v *Limiter) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("not found request in context")
 	}
 
-	token := apiRequest.GetParams().GetAccessToken()
-	if token != "" {
-		var limiter *rate.Limiter
+	params := apiRequest.GetParams()
 
-		if savedLimiter, ok := v.limitersCache.Get(token); ok {
-			limiter = savedLimiter.(*rate.Limiter)
-		} else {
-			limiter = rate.NewLimiter(v.rateLimit, 1)
-			v.limitersCache.Set(token, limiter, cache.DefaultExpiration)
+	if params != nil {
+		token := params.GetAccessToken()
+		if token != "" {
+			var limiter *rate.Limiter
+
+			if savedLimiter, ok := v.limitersCache.Get(token); ok {
+				limiter = savedLimiter.(*rate.Limiter)
+			} else {
+				limiter = rate.NewLimiter(v.rateLimit, 1)
+				v.limitersCache.Set(token, limiter, cache.DefaultExpiration)
+			}
+
+			limiter.Wait(req.Context())
 		}
-
-		limiter.Wait(req.Context())
 	}
 
 	return v.Tripper.RoundTrip(req)
