@@ -2,10 +2,11 @@ package limiter_test
 
 import (
 	"context"
-	"sync/atomic"
+	"net/http"
 	"testing"
 	"time"
 
+	"github.com/ciricc/vkapiexecutor/executor"
 	"github.com/ciricc/vkapiexecutor/limiter"
 	"github.com/ciricc/vkapiexecutor/request"
 )
@@ -18,66 +19,73 @@ func TestLimiter(t *testing.T) {
 		expectedCallsCount := rps * runDurationInSeconds
 
 		limiter := limiter.New(rps, 10*time.Minute, time.Hour)
-		handleFunc := limiter.Handle()
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(runDurationInSeconds)*time.Second)
 		defer cancel()
 
-		var completedRequests int32 = 0
-		var ctxDone = false
+		req := request.New()
+		req.Method("users.get")
 
-		for i := 0; i < 10000; i++ {
-			reqParams := request.NewParams()
-			reqParams.AccessToken("abc")
+		params := request.NewParams()
+		params.AccessToken("abc")
 
-			req := request.New()
-			req.Params(reqParams)
+		req.Params(params)
 
-			handleFunc(func(ctx context.Context, _ *request.Request) error {
-				if ctxDone {
-					atomic.AddInt32(&completedRequests, 1)
-				}
-				return nil
-			}, ctx, req)
+		exec := executor.New()
+		exec.HttpClient = &http.Client{
+			Transport: limiter,
 		}
 
-		<-ctx.Done()
-		ctxDone = true
+		var completedRequests int32 = 0
 
-		if completedRequests > int32(expectedCallsCount) {
-			t.Errorf("Requests made in one minute: %d, but expected: %d", completedRequests, expectedCallsCount)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if completedRequests > int32(expectedCallsCount) {
+					t.Errorf("Requests made: %d, but expected: %d", completedRequests, expectedCallsCount)
+					return
+				}
+
+				exec.DoRequest(req)
+				completedRequests += 1
+			}
 		}
 	})
 
 	t.Run("no token rps", func(t *testing.T) {
 		rps := 1
 		runDurationInSeconds := 5
-		expectedCallsCount := 10000
+		expectedCallsCount := 20
 
 		limiter := limiter.New(rps, 10*time.Minute, time.Hour)
-		handleFunc := limiter.Handle()
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(runDurationInSeconds)*time.Second)
 		defer cancel()
 
 		var completedRequests int32 = 0
-		var ctxDone = false
 
-		for i := 0; i < 10000; i++ {
-			req := request.New()
-			handleFunc(func(ctx context.Context, _ *request.Request) error {
-				if ctxDone {
-					atomic.AddInt32(&completedRequests, 1)
-				}
-				return nil
-			}, ctx, req)
+		req := request.New()
+		req.Method("users.get")
+
+		exec := executor.New()
+		exec.HttpClient = &http.Client{
+			Transport: limiter,
 		}
 
-		<-ctx.Done()
-		ctxDone = true
-
-		if completedRequests > int32(expectedCallsCount) {
-			t.Errorf("Requests made in one minute: %d, but expected: %d", completedRequests, expectedCallsCount)
+		for {
+			select {
+			case <-ctx.Done():
+				if completedRequests < int32(expectedCallsCount) {
+					t.Errorf("Requests made: %d, but expected minimum: %d", completedRequests, expectedCallsCount)
+					return
+				}
+				return
+			default:
+				exec.DoRequest(req)
+				completedRequests += 1
+			}
 		}
 	})
 }

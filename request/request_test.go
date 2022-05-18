@@ -2,7 +2,6 @@ package request_test
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -263,40 +262,6 @@ func TestRequest(t *testing.T) {
 
 		if req.GetHeaders() == nil {
 			t.Errorf("headers is nil")
-		}
-	})
-
-	t.Run("block request", func(t *testing.T) {
-		req := request.New()
-		req.Block(true)
-
-		if blocked, _ := req.IsBlock(); !blocked {
-			t.Errorf("request is not blocked")
-		}
-	})
-
-	t.Run("block request with reason and removes reason if unblock", func(t *testing.T) {
-		req := request.New()
-
-		blockReason := fmt.Errorf("too many requests from this token")
-		req.BlockReason(blockReason)
-
-		if blocked, reason := req.IsBlock(); blocked {
-			if reason != blockReason {
-				t.Errorf("different block reasons")
-			}
-		} else {
-			t.Errorf("request not blocked")
-		}
-
-		req.Block(false)
-		blocked, reason := req.IsBlock()
-		if reason != nil {
-			t.Errorf("block reason not removed from memory")
-		}
-
-		if blocked {
-			t.Errorf("not unblocked")
 		}
 	})
 

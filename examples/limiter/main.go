@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -18,7 +19,9 @@ func main() {
 	reqLimiter := limiter.New(2, time.Hour, time.Hour)
 
 	exec := executor.New()
-	exec.HandleApiRequest(reqLimiter.Handle())
+	exec.HttpClient = &http.Client{
+		Transport: reqLimiter,
+	}
 
 	params := request.NewParams()
 	params.AccessToken(token)

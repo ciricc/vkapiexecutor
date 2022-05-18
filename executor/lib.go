@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 
 	"github.com/ciricc/vkapiexecutor/request"
@@ -10,20 +9,10 @@ import (
 
 // Возвращает объект запроса из контекста
 func GetRequest(ctx context.Context) *request.Request {
-	req := ctx.Value(requestContextKey{})
-	if req == nil {
-		return nil
-	}
-	return req.(*request.Request)
-}
-
-// Возвращает причину, по которой нельзя выполнить запрос
-func getCantDoRequestReason(req *request.Request) error {
-	if blocked, reason := req.IsBlock(); blocked {
-		if reason != nil {
-			return fmt.Errorf("request blocked: %w", reason)
+	if ctx != nil {
+		if req, ok := ctx.Value(requestContextKeyVal).(*request.Request); ok {
+			return req
 		}
-		return fmt.Errorf("request blocked")
 	}
 	return nil
 }
@@ -39,6 +28,11 @@ func GetRequestTry(ctx context.Context) int32 {
 
 // Возвращает из контекста счетчик количества выполнений запроса
 func getRequestTryPtr(ctx context.Context) *int32 {
+
+	if ctx == nil {
+		return nil
+	}
+
 	val := ctx.Value(requestTryContextKey{})
 	if val == nil {
 		return nil

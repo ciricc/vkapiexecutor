@@ -23,6 +23,19 @@ func (v *MessagepackParser) Parse(httpResponse *http.Response) (response.Respons
 	return response.NewUnknown(httpResponse), nil
 }
 
+type CustomHttpRoundTripper struct {
+	rt http.RoundTripper
+	t  *testing.T
+}
+
+func (v *CustomHttpRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	try := executor.GetRequestTry(req.Context())
+	if try != 0 {
+		v.t.Errorf("expected request try: %d, but real is: %d", 0, try)
+	}
+	return v.rt.RoundTrip(req)
+}
+
 func solveCaptchaExample(captchaImg string) (string, error) {
 	return "captcha_key_code", nil
 }
@@ -109,177 +122,6 @@ func TestExecutor(t *testing.T) {
 		}
 	})
 
-	t.Run("test api middlewares", func(t *testing.T) {
-		req := request.New()
-		req.Method("users.get")
-
-		madeTest2 := false
-		madeTest1 := false
-
-		apiExecutor.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
-			return next(ctx, req)
-		})
-
-		apiExecutor.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
-			madeTest1 = true
-			return next(ctx, req)
-		})
-
-		apiExecutor.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
-			if madeTest1 {
-				t.Errorf("api middleware_1 earlier than first")
-			}
-
-			madeTest2 = true
-			req.Method("middleware.test")
-			return next(ctx, req)
-		})
-
-		res, err := apiExecutor.DoRequest(req)
-		if err != nil && res == nil {
-			t.Error(err)
-		}
-
-		if !madeTest1 {
-			t.Errorf("middleware_1 not called")
-		}
-
-		if !madeTest2 {
-			t.Errorf("middleware_2 not called")
-		}
-
-		if req.GetMethod() != "middleware.test" {
-			t.Errorf("middleware_2 nothing changed")
-		}
-
-		apiExecutor.ResetApiRequestHandlers()
-	})
-
-	t.Run("clear api middlwares", func(t *testing.T) {
-		req := request.New()
-		req.Method("users.get")
-
-		callDeletedMiddleware := false
-		apiExecutor.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
-			callDeletedMiddleware = true
-			return next(ctx, req)
-		})
-
-		apiExecutor.ResetApiRequestHandlers()
-		res, err := apiExecutor.DoRequest(req)
-		if res == nil && err != nil {
-			t.Error(err)
-		}
-
-		if callDeletedMiddleware {
-			t.Errorf("Call cleaned middleware")
-		}
-
-	})
-
-	t.Run("middleware returns error", func(t *testing.T) {
-		middlewareError := fmt.Errorf("middleware error")
-
-		req := request.New()
-		req.Method("users.get")
-
-		apiExecutorNew := executor.New()
-
-		apiExecutorNew.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
-			return middlewareError
-		})
-
-		_, err := apiExecutorNew.DoRequest(req)
-		if err != middlewareError {
-			t.Errorf("different errors: \n\norigin: %v, \n\nresult: %v", err, middlewareError)
-		}
-	})
-
-	t.Run("middleware for http request", func(t *testing.T) {
-		req := request.New()
-		req.Method("users.get")
-
-		madeTest2 := false
-		madeTest1 := false
-
-		apiExecutor.HandleHttpRequest(func(next executor.HttpRequestHandlerNext, req *http.Request) error {
-			return next(req)
-		})
-
-		apiExecutor.HandleHttpRequest(func(next executor.HttpRequestHandlerNext, req *http.Request) error {
-			madeTest1 = true
-			return next(req)
-		})
-
-		apiExecutor.HandleHttpRequest(func(next executor.HttpRequestHandlerNext, req *http.Request) error {
-			if madeTest1 {
-				t.Errorf("http middleware_1 earlier than first")
-			}
-
-			madeTest2 = true
-			return next(req)
-		})
-
-		res, err := apiExecutor.DoRequest(req)
-		if err != nil && res == nil {
-			t.Error(err)
-		}
-
-		if !madeTest1 {
-			t.Errorf("first added http middleware not called")
-		}
-
-		if !madeTest2 {
-			t.Errorf("second added http middleware not called")
-		}
-
-		apiExecutor.ResetHttpRequestHandlers()
-	})
-
-	t.Run("clear http request middleware handlers", func(t *testing.T) {
-		req := request.New()
-		req.Method("users.get")
-		callHttpMiddleware := false
-
-		apiExecutor.HandleHttpRequest(func(next executor.HttpRequestHandlerNext, req *http.Request) error {
-			callHttpMiddleware = true
-			return next(req)
-		})
-
-		apiExecutor.ResetHttpRequestHandlers()
-
-		res, err := apiExecutor.DoRequest(req)
-		if err != nil && res == nil {
-			t.Error(err)
-		}
-
-		if callHttpMiddleware {
-			t.Errorf("deleted http middleware called")
-		}
-	})
-
-	t.Run("middleware changes http request credentials", func(t *testing.T) {
-		req := request.New()
-		req.Method("users.get")
-
-		defer apiExecutor.ResetHttpRequestHandlers()
-
-		apiExecutor.HandleHttpRequest(func(next executor.HttpRequestHandlerNext, req *http.Request) error {
-			req.URL.Host = "api.vkontakte.ru"
-			return next(req)
-		})
-
-		res, err := apiExecutor.DoRequest(req)
-		if err != nil && res == nil {
-			t.Error(err)
-		}
-
-		responseLocation := res.HttpResponse().Request.URL
-		if responseLocation.Host != "api.vkontakte.ru" {
-			t.Errorf("http middleware nothing changed")
-		}
-	})
-
 	t.Run("custom response parser", func(t *testing.T) {
 
 		req := request.New()
@@ -297,28 +139,6 @@ func TestExecutor(t *testing.T) {
 
 		if !msgPackParser.Parsed {
 			t.Error("not parsed by custom parser")
-		}
-	})
-
-	t.Run("middleware which stops request", func(t *testing.T) {
-		params := request.NewParams()
-
-		req := request.New()
-		req.Params(params)
-
-		exec := executor.New()
-
-		exec.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
-			if req.GetMethod() == "" || req.GetParams().GetAccessToken() == "" {
-				req.Block(true)
-			}
-			return next(ctx, req)
-		})
-
-		res, err := exec.DoRequest(req)
-
-		if err != nil && res != nil {
-			t.Errorf("not blocked request")
 		}
 	})
 
@@ -354,13 +174,12 @@ func TestExecutor(t *testing.T) {
 
 		exec := executor.New()
 
-		exec.HandleApiRequest(func(next executor.ApiRequestHandlerNext, ctx context.Context, req *request.Request) error {
-			try := executor.GetRequestTry(ctx)
-			if try != 0 {
-				t.Errorf("expected request try: %d, but real is: %d", 0, try)
-			}
-			return next(ctx, req)
-		})
+		exec.HttpClient = &http.Client{
+			Transport: &CustomHttpRoundTripper{
+				rt: http.DefaultTransport,
+				t:  t,
+			},
+		}
 
 		res, err := exec.DoRequest(req)
 		if err != nil && res == nil {
@@ -518,9 +337,12 @@ func TestExecutor(t *testing.T) {
 						}
 
 						req := executor.GetRequest(res.Context())
-
-						req.GetParams().Set("captcha_key", captchaResult)
-						req.GetParams().Set("captcha_sid", apiError.CaptchaSid)
+						if req == nil {
+							t.Errorf("Request is nil")
+						} else {
+							req.GetParams().Set("captcha_key", captchaResult)
+							req.GetParams().Set("captcha_sid", apiError.CaptchaSid)
+						}
 
 						// res.Renew(true)
 					}
