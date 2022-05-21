@@ -11,6 +11,8 @@ import (
 
 func TestResponseWithoutContext(t *testing.T) {
 	req := request.New()
+	req.Method("users.get")
+
 	httpReq, err := req.HttpRequestGet()
 
 	if err != nil {

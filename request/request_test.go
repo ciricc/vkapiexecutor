@@ -1,12 +1,12 @@
 package request_test
 
 import (
-	"bytes"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -137,6 +137,7 @@ func TestRequest(t *testing.T) {
 		req.Headers(http.Header{
 			"Authorization": {"1"},
 		})
+
 		req.Params(params)
 
 		httpReq, err := req.HttpRequestGet()
@@ -144,7 +145,7 @@ func TestRequest(t *testing.T) {
 			t.Error(err)
 		}
 
-		expectedReqUrl, err := url.Parse("https://api.vk.com/method/users.get?access_token=abc&device_id=&lang=en&v=5.131")
+		expectedReqUrl, err := url.Parse("https://api.vk.com/method/users.get?access_token=abc&lang=en&v=5.131")
 		if err != nil {
 			t.Error(err)
 		}
@@ -194,9 +195,7 @@ func TestRequest(t *testing.T) {
 				"Content-Type":  {"application/x-www-form-urlencoded"},
 				"Authorization": {"1"},
 			},
-			Body: io.NopCloser(bytes.NewBuffer([]byte(
-				"access_token=abc&device_id=&lang=en&v=5.131",
-			))),
+			Body: io.NopCloser(strings.NewReader("access_token=abc&lang=en&v=5.131")),
 		}
 
 		if !reflect.DeepEqual(httpReq, expectedHttpRequest) {
