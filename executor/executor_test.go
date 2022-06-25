@@ -3,7 +3,9 @@ package executor_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -301,6 +303,29 @@ func TestExecutor(t *testing.T) {
 
 		if err != returnErr {
 			t.Errorf("got error: %s", returnErr)
+		}
+	})
+
+	t.Run("http rewrite response body", func(t *testing.T) {
+		req := request.New()
+		req.Method("some.not.found.method")
+
+		exec := executor.New()
+
+		exec.HandleHttpResponse(func(next executor.HttpResponseHandlerNext, res *http.Response) error {
+			req := executor.GetRequest(res.Request.Context())
+			if req != nil {
+				if req.GetMethod() == "some.not.found.method" {
+					res.Body.Close() // important to close body !!
+					res.Body = io.NopCloser(strings.NewReader(`{"response": true}`))
+				}
+			}
+			return next(res)
+		})
+
+		_, err := exec.DoRequest(req)
+		if err != nil {
+			t.Error(err)
 		}
 	})
 

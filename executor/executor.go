@@ -17,13 +17,16 @@ var DefaultResponseParser responseparser.Parser = &jsonresponseparser.JsonRespon
 
 type ApiResponseHandlerNext func(res response.Response) error
 type ApiResponseHandler func(next ApiResponseHandlerNext, res response.Response) error
+type HttpResponseHandlerNext func(res *http.Response) error
+type HttpResponseHandler func(next HttpResponseHandlerNext, res *http.Response) error
 
 // Отвечает за выполнение API запросов ВКонтакте
 type Executor struct {
-	HttpClient        *http.Client          // HTTP клиент для отправки запросов. Вы можете задать свой клиент, настроив, например, прокси или KeepAlive соединение
-	ResponseParser    responseparser.Parser // Парсер ответа ВКонтакте. Можно переназначить для парсинга других форматов
-	apiResponseHandle ApiResponseHandler    // Последлний добавленный обработчик API ответа
-	MaxRequestTries   int
+	HttpClient         *http.Client          // HTTP клиент для отправки запросов. Вы можете задать свой клиент, настроив, например, прокси или KeepAlive соединение
+	ResponseParser     responseparser.Parser // Парсер ответа ВКонтакте. Можно переназначить для парсинга других форматов
+	apiResponseHandle  ApiResponseHandler    // Последний добавленный обработчик API ответа
+	httpResponseHandle HttpResponseHandler   // Последний добавленный обработчик HTTP ответа
+	MaxRequestTries    int
 }
 
 type requestTryContextKey struct{} // Ключ счетчика попыток запроса в контексте
@@ -38,6 +41,9 @@ func New() *Executor {
 		ResponseParser:    DefaultResponseParser,
 		apiResponseHandle: func(next ApiResponseHandlerNext, res response.Response) error { return nil },
 		MaxRequestTries:   DefaultMaxRequestTries,
+		httpResponseHandle: func(next HttpResponseHandlerNext, res *http.Response) error {
+			return nil
+		},
 	}
 }
 
@@ -51,9 +57,24 @@ func (v *Executor) HandleApiResponse(handler ApiResponseHandler) {
 	}
 }
 
+// Устанавливает обработчик ответов сервера
+func (v *Executor) HandleHttpResponse(handler HttpResponseHandler) {
+	nextHandler := v.httpResponseHandle
+	v.httpResponseHandle = func(next HttpResponseHandlerNext, res *http.Response) error {
+		return handler(func(res *http.Response) error {
+			return nextHandler(nil, res)
+		}, res)
+	}
+}
+
 // Отчищает очередь из middleware API ответов
 func (v *Executor) ResetApiResponseHandlers() {
 	v.apiResponseHandle = func(next ApiResponseHandlerNext, res response.Response) error { return nil }
+}
+
+// Отчищает очередь из обработчиков HTTP овтетов
+func (v *Executor) ResetHttpResponseHandlers() {
+	v.httpResponseHandle = func(next HttpResponseHandlerNext, res *http.Response) error { return nil }
 }
 
 // Выполняет запрос к VK API
@@ -106,9 +127,13 @@ func (v *Executor) DoRequestCtxParser(ctx context.Context, req *request.Request,
 
 	res, err := v.HttpClient.Do(httpReq)
 	addRequestTry(requestTry)
-
 	if err != nil {
 		return nil, fmt.Errorf("http error: %w", err)
+	}
+
+	err = v.httpResponseHandle(nil, res)
+	if err != nil {
+		return nil, err
 	}
 
 	apiResponse, err := parser.Parse(res)
