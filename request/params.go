@@ -8,6 +8,7 @@ var AccessTokenParamKey = "access_token"
 var VersionParamKey = "v"
 var LangParamKey = "lang"
 var DeviceIdParamKey = "device_id"
+var AnonymousTokenKey = "anonymous_token"
 
 // Параметры запроса к API VK
 // Включает в себя как базовые параметры, которые встречаются во всех методах,
@@ -66,6 +67,11 @@ func (v *Params) String() string {
 // Устанавливает токен доступа
 func (v Params) AccessToken(token string) {
 	v.Set(AccessTokenParamKey, token)
+}
+
+// Устанавливает анонимный токен
+func (v Params) AnonymousToken(token string) {
+	v.Set(AnonymousTokenKey, token)
 }
 
 // Возвращает параметр токена доступа
