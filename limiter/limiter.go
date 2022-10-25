@@ -43,6 +43,10 @@ func (v *Limiter) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if params != nil {
 		token := params.GetAccessToken()
+		if token == "" {
+			token = params.GetAnonymousToken()
+		}
+
 		if token != "" {
 			var limiter *rate.Limiter
 

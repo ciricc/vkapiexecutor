@@ -79,6 +79,11 @@ func (v *Params) GetAccessToken() string {
 	return v.Get(AccessTokenParamKey)
 }
 
+// Возвращает анонимный токен
+func (v *Params) GetAnonymousToken() string {
+	return v.Get(AccessTokenParamKey)
+}
+
 // Устанавливает версию API
 func (v Params) Version(version string) {
 	v.Set(VersionParamKey, version)
