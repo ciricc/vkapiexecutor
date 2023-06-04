@@ -13,7 +13,7 @@ type LimiterTripper http.RoundTripper
 // Объект, хранящий в себе все лимитеры запросов на конкретный токен.
 // Чтобы не засорять память, в случае, если у вас много (сотни или тысячи) различных токенов,
 // в этом пакете используется кеширование лимитеров. Лимитеры токенов регулярно удаляются из памяти.
-type tripper struct {
+type Tripper struct {
 	store   LimiterStore
 	Tripper http.RoundTripper
 }
@@ -32,14 +32,14 @@ func New(rps int, limiterExpiration, cacheCleanupInterval time.Duration) Limiter
 // NewWithStore используется для переназначения хранилища лимитеров
 // и более точного определения алгоритма лимитеров
 func NewWithStore(store LimiterStore) LimiterTripper {
-	return &tripper{
+	return &Tripper{
 		store:   store,
 		Tripper: http.DefaultTransport,
 	}
 }
 
 // RoundTrip возвращает функцию middleware для пакета executor
-func (v *tripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (v *Tripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	apiReq := executor.GetRequest(req.Context())
 	if apiReq == nil {
 		return nil, ErrRequestEmpty
