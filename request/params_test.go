@@ -3,11 +3,18 @@ package request_test
 import (
 	"fmt"
 	"net/url"
+	"reflect"
 	"testing"
 
 	"github.com/ciricc/vkapiexecutor/request"
 )
 
+func changeAndValidateParams(t *testing.T, expectedVal string, changer func(v string), validator func() string) {
+	changer(expectedVal)
+	if validator() != expectedVal {
+		t.Errorf("parameter was changed by %v changed into %s value, but nothing changed in %v validator", reflect.TypeOf(changer), expectedVal, reflect.TypeOf(validator))
+	}
+}
 func TestParams(t *testing.T) {
 	params := request.NewParams()
 	params.RemoveBlanks = false
@@ -27,20 +34,24 @@ func TestParams(t *testing.T) {
 	t.Run("params changes self", func(t *testing.T) {
 		cases := [](func(*request.Params) error){
 			func(p *request.Params) error {
-				p.AccessToken("abc")
+				changeAndValidateParams(t, "access_tokein", p.AccessToken, p.GetAccessToken)
 				return fmt.Errorf("access token same")
 			},
 			func(p *request.Params) error {
-				p.Version("1.130")
+				changeAndValidateParams(t, "5.130", p.Version, p.GetVersion)
 				return fmt.Errorf("version same")
 			},
 			func(p *request.Params) error {
-				p.Lang("fr")
+				changeAndValidateParams(t, "fr", p.Lang, p.GetLang)
 				return fmt.Errorf("langage same")
 			},
 			func(p *request.Params) error {
-				p.DeviceId("1234567890")
+				changeAndValidateParams(t, "1234567890", p.DeviceId, p.GetDeviceId)
 				return fmt.Errorf("device id same")
+			},
+			func(p *request.Params) error {
+				changeAndValidateParams(t, "anonymous_token", p.AnonymousToken, p.GetAnonymousToken)
+				return fmt.Errorf("anonymous token same")
 			},
 		}
 

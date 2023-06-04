@@ -35,6 +35,10 @@ func (c *limiterStoreTtlCache) GetLimiter(
 
 	token := params.GetAccessToken()
 	if token == "" {
+		token = params.GetAnonymousToken()
+	}
+
+	if token == "" {
 		return DefaultLimiter, nil
 	}
 

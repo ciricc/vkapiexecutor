@@ -3,6 +3,7 @@ package limiter_test
 import (
 	"context"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,44 +15,67 @@ import (
 func TestLimiter(t *testing.T) {
 	t.Run("rps test", func(t *testing.T) {
 		// 1 requests per second on 10 seconds duration calls
-		rps := 1
-		runDurationInSeconds := 10
-		expectedCallsCount := rps * runDurationInSeconds
-
-		limiter := limiter.New(rps, 10*time.Minute, time.Hour)
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(runDurationInSeconds)*time.Second)
-		defer cancel()
-
-		req := request.New()
-		req.Method("users.get")
-
-		params := request.NewParams()
-		params.AccessToken("abc")
-
-		req.Params(params)
-
-		exec := executor.New()
-		exec.HttpClient = &http.Client{
-			Transport: limiter,
+		testCases := []struct {
+			rps                 int
+			runDurationInSecods int
+			params              *request.Params
+		}{
+			{
+				rps:                 1,
+				runDurationInSecods: 10,
+				params:              request.NewParams(),
+			},
+			{
+				rps:                 1,
+				runDurationInSecods: 10,
+				params:              request.NewParams(),
+			},
 		}
 
-		var completedRequests int32 = 0
+		// Set variant of tokens
+		testCases[0].params.AccessToken("use_access_token")
+		testCases[1].params.AnonymousToken("use_anonymous_token")
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if completedRequests > int32(expectedCallsCount) {
-					t.Errorf("Requests made: %d, but expected: %d", completedRequests, expectedCallsCount)
-					return
+		wg := sync.WaitGroup{}
+		for _, test := range testCases {
+			test := test
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				expectedCallsCount := test.rps * test.runDurationInSecods
+				limiter := limiter.New(test.rps, 10*time.Minute, time.Hour)
+
+				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(test.runDurationInSecods)*time.Second)
+				defer cancel()
+
+				req := request.New()
+				req.Method("users.get")
+				req.Params(test.params)
+
+				exec := executor.New()
+				exec.HttpClient = &http.Client{
+					Transport: limiter,
 				}
 
-				exec.DoRequest(req)
-				completedRequests += 1
-			}
+				var completedRequests int32 = 0
+
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					default:
+						if completedRequests > int32(expectedCallsCount) {
+							t.Errorf("Requests made: %d, but expected: %d, test_case=%v params=%v", completedRequests, expectedCallsCount, test, *test.params)
+							return
+						}
+
+						exec.DoRequest(req)
+						completedRequests += 1
+					}
+				}
+			}()
 		}
+		wg.Wait()
 	})
 
 	t.Run("no token rps", func(t *testing.T) {
