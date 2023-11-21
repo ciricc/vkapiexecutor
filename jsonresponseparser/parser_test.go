@@ -2,6 +2,7 @@ package jsonresponseparser_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/ciricc/vkapiexecutor/jsonresponseparser"
 	"github.com/ciricc/vkapiexecutor/response"
 	"github.com/ciricc/vkapiexecutor/responseparser"
+	"github.com/stretchr/testify/require"
 )
 
 type JsonResponseTestCase struct {
@@ -19,143 +21,137 @@ type JsonResponseTestCase struct {
 }
 
 func TestParser(t *testing.T) {
-	httpRes, err := http.Get("https://api.vk.com/method/users.get")
-	if err != nil {
-		t.Error(err)
-	}
+	t.Parallel()
 
 	var responseParser responseparser.Parser = &jsonresponseparser.JsonResponseParser{}
-	res, err := responseParser.Parse(httpRes)
 
-	if err != nil {
-		t.Errorf("parse error: %s", err)
-	}
+	t.Run("simple parse test cases", func(t *testing.T) {
+		t.Parallel()
+		vkApiTestCases := []JsonResponseTestCase{
+			{
+				ResultBody: `{"error":{"error_msg":"Captcha needed", "error_code":14, "captcha_sid":"1", "captcha_img":` +
+					`"https://vk.com/captcha.php?sid=1"}}`,
+				HasError:      true,
+				HasParseError: false,
+				Tag:           "captcha error",
+			},
+			{
+				ResultBody:    `{"response":1}`,
+				HasError:      false,
+				Tag:           "response ok",
+				HasParseError: false,
+			},
+			{
+				ResultBody:    `{"error":{"error_msg":"Validation required", "error_code": 17, "redirect_uri":"redirect_uri"}}`,
+				HasError:      true,
+				HasParseError: false,
+				Tag:           "validation error",
+			},
+			{
+				ResultBody:    `EOF`,
+				HasError:      false,
+				HasParseError: true,
+				Tag:           "something wrong with vk api",
+			},
+			{
+				ResultBody: `{"response":[false],"execute_errors":[{"method":"messages.send","error_code":900,"error_msg":` +
+					`"Can't send messages for users from blacklist"}]}`,
+				HasError:      true,
+				HasParseError: false,
+				Tag:           "returns execute errors list",
+			},
+		}
+		for _, testCase := range vkApiTestCases {
+			//nolint:exhaustruct
+			customResponse := http.Response{
+				Body: io.NopCloser(bytes.NewBufferString(testCase.ResultBody)),
+			}
 
-	t.Run("response has error", func(t *testing.T) {
-		if res.Error() == nil {
-			t.Errorf("response has no errors")
+			res, err := responseParser.(*jsonresponseparser.JsonResponseParser).Parse(&customResponse)
+			if testCase.HasParseError {
+				require.Error(t, err, fmt.Sprintf("%s must have a parse error", testCase.Tag))
+			} else {
+				require.NoError(t, err, fmt.Sprintf("%s must have not a parse error", testCase.Tag))
+			}
+
+			if testCase.HasError {
+				require.Error(t, res.Error(), fmt.Sprintf("%s must have response error", testCase.Tag))
+			} else {
+				require.NoError(t, res.Error(), fmt.Sprintf("%s must have not response error", testCase.Tag))
+			}
 		}
 	})
 
-	vkApiTestCases := []JsonResponseTestCase{
-		{
-			ResultBody:    `{"error":{"error_msg":"Captcha needed", "error_code":14, "captcha_sid":"1", "captcha_img":"https://vk.com/captcha.php?sid=1"}}`,
-			HasError:      true,
-			HasParseError: false,
-			Tag:           "captcha error",
-		},
-		{
-			ResultBody:    `{"response":1}`,
-			HasError:      false,
-			Tag:           "response ok",
-			HasParseError: false,
-		},
-		{
-			ResultBody:    `{"error":{"error_msg":"Validation required", "error_code": 17, "redirect_uri":"redirect_uri"}}`,
-			HasError:      true,
-			HasParseError: false,
-			Tag:           "validation error",
-		},
-		{
-			ResultBody:    `EOF`,
-			HasError:      false,
-			HasParseError: true,
-			Tag:           "something wrong with vk api",
-		},
-	}
-	for _, testCase := range vkApiTestCases {
-		customResponse := http.Response{
-			Body: io.NopCloser(bytes.NewBuffer([]byte(testCase.ResultBody))),
-		}
-
-		res, err = responseParser.(*jsonresponseparser.JsonResponseParser).Parse(&customResponse)
-		if err != nil {
-			if !testCase.HasParseError {
-				t.Error(err)
-			}
-		} else {
-			if testCase.HasParseError {
-				t.Errorf("expected parse error but error is nil.\ntest case: %q", testCase.Tag)
-			}
-		}
-
-		if res.Error() == nil && testCase.HasError {
-			t.Errorf("expected error on test case, but got nil. Test case: %s", testCase.Tag)
-		} else if res.Error() != nil && !testCase.HasError {
-			t.Errorf("expected error nil on test case, but got error: %q. Test case: %s", res.Error(), testCase.Tag)
-		}
-	}
-
 	t.Run("validation error fields test", func(t *testing.T) {
-		res, err := responseParser.Parse(&http.Response{
-			Body: io.NopCloser(bytes.NewBuffer([]byte(`{"error":{"error_msg":"Validation required", "error_code": 17, "redirect_uri":"redirect_uri"}}`))),
-		})
-		if err != nil {
-			t.Error(err)
-		}
+		t.Parallel()
+
+		res, err := responseParser.Parse(
+			//nolint:exhaustruct
+			&http.Response{
+				Body: io.NopCloser(
+					bytes.NewBufferString(`{"error":{"error_msg":"Validation required", "error_code": 17, "redirect_uri":` +
+						`"redirect_uri"}}`),
+				),
+			},
+		)
+		require.NoError(t, err)
+
 		apiError := res.Error()
-		if apiError == nil {
-			t.Errorf("no error found")
-		}
-		switch errorObject := apiError.(type) {
-		case *response.Error:
-			if errorObject.RedirectUri != "redirect_uri" {
-				t.Errorf("not found redirect uri string in error\ngot: %q, expected: %q", errorObject.RedirectUri, "redirect_uri")
-			}
-		default:
-			t.Errorf("unknown error type")
-		}
+
+		require.Error(t, apiError)
+
+		var errorObject *response.Error
+		require.ErrorAs(t, apiError, &errorObject)
+
+		require.Equal(t, errorObject.RedirectUri, "redirect_uri")
 	})
 
 	t.Run("captcha error fields test", func(t *testing.T) {
-		res, err := responseParser.(*jsonresponseparser.JsonResponseParser).Parse(&http.Response{
-			Body: io.NopCloser(bytes.NewBuffer([]byte(`{"error":{"error_msg":"Captcha needed", "error_code":14, "captcha_sid":"1", "captcha_img":"https://vk.com/captcha.php?sid=1"}}`))),
-		})
-		if err != nil {
-			t.Error(err)
-		}
+		t.Parallel()
+
+		res, err := responseParser.(*jsonresponseparser.JsonResponseParser).Parse(
+			//nolint:exhaustruct
+			&http.Response{
+				Body: io.NopCloser(
+					bytes.NewBufferString(
+						`{"error":{"error_msg":"Captcha needed", "error_code":14, "captcha_sid":"1",` +
+							`"captcha_img":"https://vk.com/captcha.php?sid=1"}}`,
+					),
+				),
+			})
+
+		require.NoError(t, err)
+
 		apiError := res.Error()
-		if apiError == nil {
-			t.Errorf("no error found")
-		}
-		switch errorObject := apiError.(type) {
-		case *response.Error:
-			expectedCaptchaImg := "https://vk.com/captcha.php?sid=1"
-			if errorObject.CaptchaImg != expectedCaptchaImg {
-				t.Errorf("captcha img different \ngot: %q, expected: %q", errorObject.CaptchaImg, expectedCaptchaImg)
-			}
-			expectedCaptchaSid := "1"
-			if errorObject.CaptchaSid != expectedCaptchaSid {
-				t.Errorf("captcha sid different \ngot: %q, expected: %q", errorObject.CaptchaSid, expectedCaptchaSid)
-			}
-		default:
-			t.Errorf("unknown error type")
-		}
+		require.Error(t, apiError)
+
+		var errorObject *response.Error
+
+		require.ErrorAs(t, apiError, &errorObject)
+		require.Equal(t, errorObject.CaptchaImg, "https://vk.com/captcha.php?sid=1")
+		require.Equal(t, errorObject.CaptchaSid, "1")
 	})
 
 	t.Run("error global fields test", func(t *testing.T) {
-		res, err := responseParser.(*jsonresponseparser.JsonResponseParser).Parse(&http.Response{
-			Body: io.NopCloser(bytes.NewBuffer([]byte(`{"error":{"error_msg":"Captcha needed", "error_code":14, "captcha_sid":"1", "captcha_img":"https://vk.com/captcha.php?sid=1"}}`))),
-		})
-		if err != nil {
-			t.Error(err)
-		}
+		t.Parallel()
+		res, err := responseParser.(*jsonresponseparser.JsonResponseParser).Parse(
+			//nolint:exhaustruct
+			&http.Response{
+				Body: io.NopCloser(bytes.NewBufferString(
+					`{"error":{"error_msg":"Captcha needed", "error_code":14, "captcha_sid":"1",` +
+						`"captcha_img":"https://vk.com/captcha.php?sid=1"}}`,
+				),
+				),
+			})
+		require.NoError(t, err)
+
 		apiError := res.Error()
-		if apiError == nil {
-			t.Errorf("no error found")
-		}
-		switch errorObject := apiError.(type) {
-		case *response.Error:
-			expectedErrorCode := 14
-			if errorObject.IntCode() != expectedErrorCode {
-				t.Errorf("error code different \ngot: %d, expected: %d", errorObject.IntCode(), expectedErrorCode)
-			}
-			expectedErrorMessage := "Captcha needed"
-			if errorObject.Error() != expectedErrorMessage {
-				t.Errorf("error message different \ngot: %q, expected: %q", errorObject.Error(), expectedErrorMessage)
-			}
-		default:
-			t.Errorf("unknown error type")
-		}
+		require.Error(t, apiError)
+
+		var errorObject *response.Error
+
+		require.ErrorAs(t, apiError, &errorObject)
+		require.Equal(t, errorObject.IntCode(), 14)
+		require.Equal(t, errorObject.Error(), "Captcha needed")
 	})
 }
