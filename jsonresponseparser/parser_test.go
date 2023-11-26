@@ -154,4 +154,34 @@ func TestParser(t *testing.T) {
 		require.Equal(t, errorObject.IntCode(), 14)
 		require.Equal(t, errorObject.Error(), "Captcha needed")
 	})
+
+	t.Run("execute errors parsing correctly", func(t *testing.T) {
+		t.Parallel()
+		res, err := responseParser.(*jsonresponseparser.JsonResponseParser).Parse(
+			//nolint:exhaustruct
+			&http.Response{
+				Body: io.NopCloser(bytes.NewBufferString(
+					`{"response":[false],"execute_errors":[` +
+						`{"method":"messages.send","error_code":900,"error_msg":` + `
+						"Can't send messages for users from blacklist"},` +
+						`{"error_msg":"Captcha needed", "error_code":14, "captcha_sid":"1",` +
+						`"captcha_img":"https://vk.com/captcha.php?sid=1"}]}`,
+				),
+				),
+			})
+		require.NoError(t, err)
+
+		apiError := res.Error()
+		require.Error(t, apiError)
+
+		var errorObject *response.ExecuteErrors
+
+		require.ErrorAs(t, apiError, &errorObject)
+		errorsList := errorObject.Errors()
+		require.Equal(t, len(errorObject.Errors()), 2)
+		require.Equal(t, errorsList[0].IntCode(), 900)
+		require.Equal(t, errorsList[0].Error(), "Can't send messages for users from blacklist")
+		require.Equal(t, errorsList[0].Method, "messages.send")
+		require.Equal(t, errorsList[1].IntCode(), 14)
+	})
 }
