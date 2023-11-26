@@ -9,11 +9,18 @@ import (
 
 // Стандартный интерфейс, который понимает executor
 type Response interface {
-	Context() context.Context     // Возвращает контекст запроса
-	Body() []byte                 // Возвращает тело ответа в байтах
-	String() string               // Возвращает тело ответа в строковом представлении
-	Error() error                 // Возвращает информацию об ошибке выполнения запроса
-	HttpResponse() *http.Response // Возвращает объект HTTP ответа
+	// Возвращает контекст запроса
+	Context() context.Context
+	// Возвращает тело ответа в байтах
+	Body() []byte
+	// Возвращает тело ответа в строковом представлении
+	String() string
+	// Возвращает информацию об ошибке выполнения запроса
+	Error() error
+	// Возвращает объект HTTP ответа
+	HttpResponse() *http.Response
+	// Устанавливате необходимость перевыплнить запрос
+	// Используется в основном в хуках
 	Renew(renew bool)
 	IsRenew() bool
 }
@@ -29,6 +36,7 @@ type UnknownResponse struct {
 func NewUnknown(httpResponse *http.Response) *UnknownResponse {
 	bodyBytes := bytes.NewBuffer(make([]byte, 0))
 	io.Copy(bodyBytes, httpResponse.Body)
+
 	return &UnknownResponse{
 		response:  httpResponse,
 		bodyBytes: bodyBytes.Bytes(),

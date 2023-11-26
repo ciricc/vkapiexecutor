@@ -106,8 +106,10 @@ func (v *Request) AppendHeaders(headers http.Header) {
 	v.setContentTypeHeader()
 }
 
-/* Возвращает URL запроса без параметров.
-   Метод использует значение переменной request.DefaultBaseRequestUrl
+/*
+Возвращает URL запроса без параметров.
+
+	Метод использует значение переменной request.DefaultBaseRequestUrl
 */
 func (v *Request) GetRequestUrl() (*url.URL, error) {
 	baseUrl, err := url.Parse(DefaultBaseRequestUrl)
